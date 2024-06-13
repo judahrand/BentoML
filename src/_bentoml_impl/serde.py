@@ -10,6 +10,7 @@ from urllib.parse import unquote
 from urllib.parse import urlparse
 
 import attrs
+import ormsgpack
 from pydantic import BaseModel
 from starlette.datastructures import Headers
 from starlette.datastructures import UploadFile
@@ -163,6 +164,37 @@ class JSONSerde(GenericSerde, Serde):
         return json.loads(b"".join(payload.data) or b"{}")
 
 
+class MessagePackSerde(GenericSerde, Serde):
+    media_type = "application/vnd.msgpack"
+
+    def serialize_model(self, model: IODescriptor) -> Payload:
+        return Payload(
+            (
+                ormsgpack.packb(
+                    model.model_dump(
+                        mode="json",
+                        exclude=set(getattr(model, "multipart_fields", set())),
+                    )
+                ),
+            )
+        )
+
+    def deserialize_model(self, payload: Payload, cls: type[T]) -> T:
+        data = b"".join(payload.data)
+        if not data:
+            return cls()
+        return cls.model_validate(ormsgpack.unpackb(data))
+
+    def serialize_value(self, obj: t.Any) -> Payload:
+        return Payload((ormsgpack.packb(obj),))
+
+    def deserialize_value(self, payload: Payload) -> t.Any:
+        data = b"".join(payload.data)
+        if not data:
+            return None
+        return ormsgpack.unpackb(data)
+
+
 class MultipartSerde(JSONSerde):
     media_type = "multipart/form-data"
 
@@ -246,7 +278,13 @@ class PickleSerde(GenericSerde, Serde):
 
 
 ALL_SERDE: t.Mapping[str, type[Serde]] = {
-    s.media_type: s for s in [JSONSerde, PickleSerde, MultipartSerde]
+    s.media_type: s
+    for s in [
+        JSONSerde,
+        MessagePackSerde,
+        PickleSerde,
+        MultipartSerde,
+    ]
 }
 # Special case for application/x-www-form-urlencoded
 ALL_SERDE["application/x-www-form-urlencoded"] = MultipartSerde

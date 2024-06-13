@@ -48,6 +48,7 @@ dependencies = [
     "opentelemetry-instrumentation-asgi==0.41b0",
     "opentelemetry-semantic-conventions==0.41b0",
     "opentelemetry-util-http==0.41b0",
+    "ormsgpack>=1.5.0",
     "packaging>=22.0",
     "pathspec",
     "pip-tools>=6.6.2",
